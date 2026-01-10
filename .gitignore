@@ -1,0 +1,80 @@
+########################################
+# OS / Editor
+########################################
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
+*.iml
+
+########################################
+# Logs
+########################################
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+########################################
+# Java / Gradle
+########################################
+# Gradle cache + state (NEVER commit)
+**/.gradle/
+.gradle/
+
+# Build outputs (usually not committed)
+**/build/
+build/
+out/
+bin/
+*.class
+
+# IntelliJ / Eclipse (if used)
+.classpath
+.project
+.settings/
+
+########################################
+# C / CMake
+########################################
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+########################################
+# Python
+########################################
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+########################################
+# Secrets / env
+########################################
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+########################################
+# Docker local
+########################################
+*.pid
