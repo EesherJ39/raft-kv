@@ -1,0 +1,45 @@
+plugins {
+id 'java'
+id 'application'
+id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+
+repositories {
+mavenCentral()
+}
+
+
+dependencies {
+// Simple console logger
+implementation 'org.slf4j:slf4j-simple:2.0.12'
+
+
+// JSON for Raft RPCs
+implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+}
+
+
+java {
+toolchain {
+languageVersion = JavaLanguageVersion.of(17)
+}
+}
+
+
+application {
+mainClass = 'com.example.raftkv.Main'
+}
+
+
+jar {
+manifest {
+attributes 'Main-Class': 'com.example.raftkv.Main'
+}
+}
+
+
+shadowJar {
+archiveBaseName.set('raftkv')
+archiveClassifier.set('all')
+}
