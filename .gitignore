@@ -32,6 +32,7 @@ build/
 out/
 bin/
 *.class
+tmp-classes-*/
 
 # IntelliJ / Eclipse (if used)
 .classpath
@@ -64,6 +65,10 @@ venv/
 env/
 .pytest_cache/
 .mypy_cache/
+
+# Local cluster state and generated measurements
+data/
+reports/
 
 ########################################
 # Secrets / env

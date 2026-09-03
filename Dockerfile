@@ -1,52 +1,44 @@
 # syntax=docker/dockerfile:1
 
-# ---- Stage 1: Build native C/JNI library ------------------------------------
-FROM ubuntu:24.04 AS c-builder
+FROM eclipse-temurin:17-jdk-jammy AS builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential cmake \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    openjdk-17-jdk \
- && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY c/ c/
+RUN cmake -S c -B build/native -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build/native --config Release --parallel
 
-WORKDIR /app/c
-COPY c/ /app/c/
+COPY java/src/main/java/ java/src/main/java/
+RUN find java/src/main/java -name '*.java' -print > build/java-sources.txt \
+    && mkdir -p build/classes \
+    && javac --release 17 -Xlint:all -Werror -d build/classes @build/java-sources.txt \
+    && jar --create --file build/raftkv.jar \
+        --main-class com.example.raftkv.Main -C build/classes .
 
-# Build shared library: libkvstore.(so|dylib|dll)
-RUN mkdir -p build \
- && cd build \
- && cmake .. -DCMAKE_BUILD_TYPE=Release \
- && cmake --build . --config Release
-
-# ---- Stage 2: Build Java fat JAR --------------------------------------------
-FROM gradle:8.7.0-jdk17 AS java-builder
-WORKDIR /app/java
-COPY java/ /app/java/
-
-# Build shadow JAR at build/libs/raftkv-all.jar
-RUN gradle --no-daemon clean shadowJar
-
-# ---- Stage 3: Runtime image -------------------------------------------------
 FROM eclipse-temurin:17-jre-jammy AS runtime
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system raftkv \
+    && useradd --system --gid raftkv --home-dir /opt/raftkv raftkv \
+    && mkdir -p /opt/raftkv/native /data \
+    && chown -R raftkv:raftkv /opt/raftkv /data
 
 WORKDIR /opt/raftkv
-RUN mkdir -p /opt/raftkv/native
+COPY --from=builder --chown=raftkv:raftkv /src/build/raftkv.jar ./raftkv.jar
+COPY --from=builder --chown=raftkv:raftkv /src/build/native/libkvstore.so ./native/libkvstore.so
 
-# Native library + application JAR
-COPY --from=c-builder    /app/c/build/libkvstore.so          /opt/raftkv/native/
-COPY --from=java-builder /app/java/build/libs/raftkv-all.jar /opt/raftkv/
-
-# Defaults (overridable by docker-compose)
 ENV PORT=8080 \
-    NODE_ID=node \
+    NODE_ID=node1 \
     DATA_DIR=/data \
-    PEERS=node=http://localhost:8080
+    PEERS=node1=http://127.0.0.1:8080 \
+    RAFT_SNAPSHOT_THRESHOLD=256
 
+USER raftkv
 VOLUME ["/data"]
 EXPOSE 8080
-
-# <<< single-line exec-form CMD (fix) >>>
-CMD ["java","-Djava.library.path=/opt/raftkv/native","-cp","/opt/raftkv/raftkv-all.jar","com.example.raftkv.Main"]
+HEALTHCHECK --interval=5s --timeout=2s --retries=10 \
+    CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
+ENTRYPOINT ["java", "-Djava.library.path=/opt/raftkv/native", "-jar", "/opt/raftkv/raftkv.jar"]

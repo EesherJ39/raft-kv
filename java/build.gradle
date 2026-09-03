@@ -1,45 +1,45 @@
 plugins {
-id 'java'
-id 'application'
-id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'application'
 }
 
-
-repositories {
-mavenCentral()
-}
-
-
-dependencies {
-// Simple console logger
-implementation 'org.slf4j:slf4j-simple:2.0.12'
-
-
-// JSON for Raft RPCs
-implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
-}
-
+group = 'com.example'
+version = '2.0.0'
 
 java {
-toolchain {
-languageVersion = JavaLanguageVersion.of(17)
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
-}
-
 
 application {
-mainClass = 'com.example.raftkv.Main'
+    mainClass = 'com.example.raftkv.Main'
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['-Xlint:all', '-Werror']
+}
+
+tasks.register('coreTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.example.raftkv.RaftCoreTest'
+    enableAssertions = true
+}
+
+tasks.register('chaosTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.example.raftkv.ChaosHarness'
+    args = ['1000']
+    enableAssertions = true
+}
+
+tasks.named('check') {
+    dependsOn coreTest, chaosTest
+}
 
 jar {
-manifest {
-attributes 'Main-Class': 'com.example.raftkv.Main'
-}
-}
-
-
-shadowJar {
-archiveBaseName.set('raftkv')
-archiveClassifier.set('all')
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
 }

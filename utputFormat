@@ -1,5 +1,0 @@
-HTTP/1.1 200 OK
-Date: Thu, 06 Nov 2025 03:39:11 GMT
-Content-length: 67
-
-role=FOLLOWER, term=1, leaderId=node3, commitIndex=0, lastApplied=0

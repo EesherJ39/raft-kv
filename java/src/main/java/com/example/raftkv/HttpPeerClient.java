@@ -1,52 +1,73 @@
 package com.example.raftkv;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.io.OutputStream;
-import java.io.InputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
-public class HttpPeerClient implements PeerClient {
+/** HTTP/1.1 production transport for the binary internal Raft RPC protocol. */
+public final class HttpPeerClient implements PeerClient {
+    private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+    private final HttpClient client;
+    private final Duration timeout;
 
-    private static String postJson(String url, String json) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        conn.setConnectTimeout(1000);
-        conn.setReadTimeout(1500);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/json");
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(json.getBytes(StandardCharsets.UTF_8));
-        }
-        int code = conn.getResponseCode();
-        InputStream is = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
-        if (is == null) return null;
-        try (is; ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
-            is.transferTo(buf);
-            return buf.toString(StandardCharsets.UTF_8);
+    public HttpPeerClient() {
+        this(Duration.ofMillis(700));
+    }
+
+    public HttpPeerClient(Duration timeout) {
+        this.timeout = timeout;
+        this.client = HttpClient.newBuilder()
+                .connectTimeout(timeout)
+                .version(HttpClient.Version.HTTP_1_1)
+                .build();
+    }
+
+    @Override
+    public RequestVote.Response requestVote(String peerId, String baseUrl, RequestVote.Request request) {
+        try {
+            return RpcCodec.decodeRequestVoteResponse(
+                    post(baseUrl + "/raft/request-vote", RpcCodec.encodeRequestVote(request)));
+        } catch (IOException | InterruptedException | RuntimeException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            return null;
         }
     }
 
     @Override
-    public AppendEntries.Response append(String baseUrl, AppendEntries.Request req) {
+    public AppendEntries.Response appendEntries(String peerId, String baseUrl, AppendEntries.Request request) {
         try {
-            String body = RpcJson.appendReqToJson(req);
-            String resp = postJson(baseUrl + "/append", body);
-            return RpcJson.appendRespFromJson(resp);
-        } catch (Exception e) {
-            return null; // treat as no-ack
+            return RpcCodec.decodeAppendEntriesResponse(
+                    post(baseUrl + "/raft/append-entries", RpcCodec.encodeAppendEntries(request)));
+        } catch (IOException | InterruptedException | RuntimeException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            return null;
         }
     }
 
     @Override
-    public RequestVote.Response requestVote(String baseUrl, RequestVote.Request req) {
+    public InstallSnapshot.Response installSnapshot(String peerId, String baseUrl, InstallSnapshot.Request request) {
         try {
-            String body = RpcJson.reqVoteReqToJson(req);
-            String resp = postJson(baseUrl + "/requestVote", body);
-            return RpcJson.reqVoteRespFromJson(resp);
-        } catch (Exception e) {
-            return null; // treat as no-ack
+            return RpcCodec.decodeInstallSnapshotResponse(
+                    post(baseUrl + "/raft/install-snapshot", RpcCodec.encodeInstallSnapshot(request)));
+        } catch (IOException | InterruptedException | RuntimeException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            return null;
         }
+    }
+
+    private byte[] post(String url, byte[] body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(timeout)
+                .header("Content-Type", "application/vnd.raftkv.rpc")
+                .header("X-RaftKV-RPC-Version", "1")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+                .build();
+        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        if (response.statusCode() != 200) throw new IOException("RPC returned " + response.statusCode());
+        if (response.body().length > MAX_RESPONSE_BYTES) throw new IOException("RPC response too large");
+        return response.body();
     }
 }

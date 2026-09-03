@@ -1,55 +1,58 @@
 services:
   node1:
     build: .
-    image: raftkv:latest
-    container_name: raftkv-node1
+    image: raftkv:local
+    init: true
     environment:
       PORT: "8080"
       NODE_ID: "node1"
       DATA_DIR: "/data"
-      PEERS: "node1=http://raftkv-node1:8080,node2=http://raftkv-node2:8080,node3=http://raftkv-node3:8080"
+      PEERS: "node1=http://node1:8080,node2=http://node2:8080,node3=http://node3:8080"
+      RAFT_SNAPSHOT_THRESHOLD: "64"
     volumes:
       - node1_data:/data
     ports:
       - "8081:8080"
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8080/status || exit 1"]
+      test: ["CMD-SHELL","curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 10
 
   node2:
-    image: raftkv:latest
-    container_name: raftkv-node2
+    image: raftkv:local
+    init: true
     environment:
       PORT: "8080"
       NODE_ID: "node2"
       DATA_DIR: "/data"
-      PEERS: "node1=http://raftkv-node1:8080,node2=http://raftkv-node2:8080,node3=http://raftkv-node3:8080"
+      PEERS: "node1=http://node1:8080,node2=http://node2:8080,node3=http://node3:8080"
+      RAFT_SNAPSHOT_THRESHOLD: "64"
     volumes:
       - node2_data:/data
     ports:
       - "8082:8080"
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8080/status || exit 1"]
+      test: ["CMD-SHELL","curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 10
 
   node3:
-    image: raftkv:latest
-    container_name: raftkv-node3
+    image: raftkv:local
+    init: true
     environment:
       PORT: "8080"
       NODE_ID: "node3"
       DATA_DIR: "/data"
-      PEERS: "node1=http://raftkv-node1:8080,node2=http://raftkv-node2:8080,node3=http://raftkv-node3:8080"
+      PEERS: "node1=http://node1:8080,node2=http://node2:8080,node3=http://node3:8080"
+      RAFT_SNAPSHOT_THRESHOLD: "64"
     volumes:
       - node3_data:/data
     ports:
       - "8083:8080"
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8080/status || exit 1"]
+      test: ["CMD-SHELL","curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 10

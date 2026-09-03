@@ -1,26 +1,18 @@
----
-
-
-## scripts/build_all.sh
-```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
+mkdir -p "$repo_root/build/native" "$repo_root/java/build/classes"
 
-# Build native lib + Java fat jar locally (use Dockerfile for containerized build).
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
+cmake -S "$repo_root/c" -B "$repo_root/build/native" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$repo_root/build/native" --config Release --parallel
 
+mapfile -d '' java_sources < <(find "$repo_root/java/src/main/java" -name '*.java' -print0)
+javac --release 17 -Xlint:all -Werror \
+    -d "$repo_root/java/build/classes" \
+    "${java_sources[@]}"
+jar --create --file "$repo_root/java/build/raftkv.jar" \
+    --main-class com.example.raftkv.Main \
+    -C "$repo_root/java/build/classes" .
 
-pushd "$ROOT/c" >/dev/null
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
-popd >/dev/null
-
-
-pushd "$ROOT/java" >/dev/null
-./gradlew clean shadowJar
-popd >/dev/null
-
-
-echo "Built native lib + Java fat jar."
+echo "Built native library and java/build/raftkv.jar"
