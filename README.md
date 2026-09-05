@@ -35,7 +35,7 @@ flowchart LR
     L -->|majority acknowledged| M[Commit + apply]
     M --> J[Java state mirror]
     M -->|JNI| W[C WAL<br/>CRC32 + fsync]
-    L -. retained log is too new .->|InstallSnapshot| F2
+    L -.->|InstallSnapshot| F2
 ```
 
 The implementation includes log-matching checks, conflict-term/index hints, current-term commit rules, committed-only state application, snapshot compaction, and atomic consensus-state persistence. Followers redirect clients to the known leader; a leader rejects operations when it cannot confirm a quorum.
